@@ -3,6 +3,9 @@ const pino = require('pino');
 const chalk = require('chalk');
 const qrcode = require('qrcode-terminal'); 
 const handleLenwyCommand = require('./lenwy');
+require('dotenv').config();
+const db = require('./db');
+const lenwyHandler = require('./lenwy');
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState('./session');
 
