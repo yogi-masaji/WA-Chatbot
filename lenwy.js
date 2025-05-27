@@ -1,263 +1,231 @@
-    // Panggil Scrape
-    const Ai4Chat = require('./scrape/Ai4Chat')
-    const agentAI = require('./scrape/agentAI');
-    const db = require('./db'); // pastikan sudah import koneksi db
+// Panggil Scrape (jika masih digunakan untuk perintah lain)
+const Ai4Chat = require('./scrape/Ai4Chat'); // Pastikan path ini benar
+const agentAI = require('./scrape/agentAI'); // Pastikan path ini benar
+// db tidak perlu di-require lagi di sini jika sudah di-pass sebagai argumen
+// const db = require('./db');
 
-    const pendingTickets = {};
+// const pendingTickets = {}; // Hapus ini, tidak digunakan lagi
 
-module.exports = async (lenwy, m) => {
-    const msg = m.messages[0]
-    if (!msg.message) return
+module.exports = async (lenwy, m, activeUserTickets, db) => { // Tambahkan activeUserTickets dan db sebagai parameter
+    const msg = m.messages[0];
+    if (!msg.message) return;
 
-    const body = msg.message.conversation || msg.message.extendedTextMessage?.text || ""
-    const sender = msg.key.remoteJid
-    const pushname = msg.pushName || "Lenwy"
+    const body = msg.message.conversation || msg.message.extendedTextMessage?.text || "";
+    const sender = msg.key.remoteJid;
+    const pushname = msg.pushName || "Pengguna WhatsApp"; // Default name
 
- if (pendingTickets[sender]) {
-    const namaMatch = body.match(/Nama:\s*(.+)/i);
-    const lokasiMatch = body.match(/Kode\s*Lokasi:\s*(.+)/i);
-    const pesanMatch = body.match(/Pesan:\s*(.+)/i);
+    // Logika untuk pendingTickets yang lama sudah dihapus karena !tiket sekarang langsung memproses.
 
-    if (namaMatch && lokasiMatch && pesanMatch) {
-        const nama = namaMatch[1].trim();
-        const locationCode = lokasiMatch[1].trim();
-        const message = pesanMatch[1].trim();
+    if (!body.startsWith("!")) return; // Hanya proses perintah
 
-        try {
-            await db.query(
-                "INSERT INTO tickets (sender, name, location_code, message) VALUES (?, ?, ?, ?)",
-                [sender, nama, locationCode, message]
-            );
-
-            await lenwy.sendMessage(sender, {
-                text: `✅ Tiket berhasil dikirim. Terima kasih, ${nama}!`
-            });
-
-            // Optional: Broadcast ke grup berdasarkan kode lokasi
-            const [rows] = await db.query(
-                "SELECT group_id FROM wa_groups WHERE location_code = ?",
-                [locationCode]
-            );
-
-            for (const row of rows) {
-                await lenwy.sendMessage(row.group_id, {
-                    text: `🎫 Tiket Baru dari ${nama} (${sender}):\n\n${message}`
-                });
-            }
-
-        } catch (err) {
-            console.error("❌ Gagal menyimpan tiket:", err);
-            await lenwy.sendMessage(sender, { text: `❌ Gagal menyimpan tiket: ${err.message}` });
-        }
-    } else {
-        await lenwy.sendMessage(sender, {
-            text: `❌ Format tidak sesuai. Mohon isi seperti ini:\n\nNama: [Nama Anda]\nKode Lokasi: [Kode Lokasi]\nPesan: [Isi pesan]`
-        });
-    }
-
-    delete pendingTickets[sender];
-}
-
-
-    if (!body.startsWith("!")) return
-
-    const args = body.slice(1).trim().split(" ")
-    const command = args.shift().toLowerCase()
+    const args = body.slice(1).trim().split(" ");
+    const command = args.shift().toLowerCase();
 
     switch (command) {
         case "halo":
-            await lenwy.sendMessage(sender, { text: "Halo Juga!" })
-            break
+            await lenwy.sendMessage(sender, { text: "Halo Juga!" });
+            break;
 
         case "ping":
-            await lenwy.sendMessage(sender, { text: "Pong!" })
-            break
+            await lenwy.sendMessage(sender, { text: "Pong!" });
+            break;
 
-        case "ai" :
-            if (args.length === 0 ) {
-                await lenwy.sendMessage(sender, { text: "Mau Tanya Apa Sama Ai?"})
-                return
-            }    
-            try {
-                const prompt = args.join(" ")
-                const response = await Ai4Chat(prompt)
-
-                let resultText
-                if (typeof response === 'string') {
-                    resultText = response
-                } else if (typeof response === 'object' && response.result) {
-                    resultText = response
-                } else {
-                    throw new Error("Format Tidak Di Dukung")
-                }
-
-                await lenwy.sendMessage(sender, { text: resultText})
-            } catch (error) {
-                console.error("Kesalahan :". error)
-                await lenwy.sendMessage(sender, { text: `Terjadi Kesalahan : ${error.message}`})
+        case "ai":
+            if (args.length === 0) {
+                await lenwy.sendMessage(sender, { text: "Mau Tanya Apa Sama Ai?" });
+                return;
             }
-            break
+            try {
+                const prompt = args.join(" ");
+                const response = await Ai4Chat(prompt); // Pastikan Ai4Chat berfungsi
+                await lenwy.sendMessage(sender, { text: response.result || response });
+            } catch (error) {
+                console.error("Kesalahan AI:", error);
+                await lenwy.sendMessage(sender, { text: `Terjadi Kesalahan AI: ${error.message}` });
+            }
+            break;
 
-
-            case "proai":
-    if (args.length === 0) {
-        await lenwy.sendMessage(sender, { text: "Mau tanya apa ke ProAI?" });
-        return;
-    }
-    try {
-        const prompt = args.join(" ");
-        const response = await agentAI(prompt); // <--- HARUS ADA DI SINI!
-
-        await lenwy.sendMessage(sender, { text: response });
-    } catch (err) {
-        console.error("Error ProAI:", err);
-        await lenwy.sendMessage(sender, { text: `Terjadi kesalahan saat menghubungi ProAI: ${err.message}` });
-    }
-    break;
-
-
-        
-        // case "ticket":
-        //     if (args.length === 0) {
-        //         await lenwy.sendMessage(sender, { text: "Mohon tulis pesan tiketnya setelah perintah !ticket" })
-        //         return
-        //     }
-        //     try {
-        //         const ticketMessage = args.join(" ")
-
-        //         // Simpan ke DB
-        //         await db.query("INSERT INTO tickets (sender, message) VALUES (?, ?)", [sender, ticketMessage])
-
-        //         await lenwy.sendMessage(sender, { text: "🎫 Tiket Anda sudah berhasil dikirim. Terima kasih!" })
-        //     } catch (error) {
-        //         console.error("Error menyimpan tiket:", error)
-        //         await lenwy.sendMessage(sender, { text: `Terjadi kesalahan: ${error.message}` })
-        //     }
-        //     break
+        case "proai":
+            if (args.length === 0) {
+                await lenwy.sendMessage(sender, { text: "Mau tanya apa ke ProAI?" });
+                return;
+            }
+            try {
+                const prompt = args.join(" ");
+                const response = await agentAI(prompt);
+                await lenwy.sendMessage(sender, { text: response });
+            } catch (err) {
+                console.error("Error ProAI:", err);
+                await lenwy.sendMessage(sender, { text: `Terjadi kesalahan saat menghubungi ProAI: ${err.message}` });
+            }
+            break;
 
         case "ticket":
-    pendingTickets[sender] = true;
-    await lenwy.sendMessage(sender, {
-        text:
-`📝 Mohon masukkan data tiket dengan format berikut:`
-    });
-    await lenwy.sendMessage(sender, {
-        text:
-`Nama: [Nama Anda]  
-Kode Lokasi: [Kode Lokasi]  
-Pesan: [Isi pesan]`
-    });
-    break;
+            if (args.length === 0) {
+                await lenwy.sendMessage(sender, { text: "Mohon sertakan isi pesan untuk tiket Anda.\nContoh: `!tiket Tolong bantu perbaiki printer saya.`" });
+                return;
+            }
+            const initialTicketMessage = args.join(" ");
+
+            // Cek apakah user sudah punya tiket aktif
+            if (activeUserTickets[sender]) {
+                const existingTicketId = activeUserTickets[sender];
+                 try {
+                    const [ticketCheck] = await db.query('SELECT status FROM tickets WHERE id = ? AND sender = ?', [existingTicketId, sender]);
+                    if (ticketCheck.length > 0 && ticketCheck[0].status === 'open') {
+                        await lenwy.sendMessage(sender, { text: `Anda sudah memiliki tiket aktif dengan ID #${existingTicketId}. Balas chat ini untuk melanjutkan, atau tutup tiket tersebut terlebih dahulu.` });
+                        return;
+                    } else {
+                        // Tiket lama sudah closed atau tidak valid, bisa buat baru
+                        delete activeUserTickets[sender];
+                    }
+                } catch (checkError) {
+                    console.error("Error cek tiket aktif:", checkError);
+                    // Lanjutkan pembuatan tiket baru jika ada error
+                }
+            }
 
 
-            case "ticketstatus":
-    try {
-        const [rows] = await db.query(
-            "SELECT * FROM tickets WHERE sender = ? ORDER BY created_at DESC LIMIT 5",
-            [sender] // ini '628xxxxx@s.whatsapp.net'
-        );
+            try {
+                // 1. Buat entri di tabel 'tickets'
+                const [ticketResult] = await db.query(
+                    "INSERT INTO tickets (sender, name, message, status, created_at, updated_at, location_code) VALUES (?, ?, ?, 'open', ?, ?, NULL)",
+                    [sender, pushname, initialTicketMessage, new Date(), new Date()]
+                );
+                const newTicketId = ticketResult.insertId;
 
-        if (rows.length === 0) {
-            await lenwy.sendMessage(sender, { text: "Kamu belum punya tiket apa pun." });
-            return;
-        }
+                if (!newTicketId) {
+                    throw new Error("Gagal mendapatkan ID tiket baru dari database.");
+                }
 
-        let ticketList = "🎫 *Tiket Kamu:*\n\n";
-        rows.forEach((row, i) => {
-    ticketList += `*#${i + 1}*\n` + // Nomor tiket
-                  `Pesan: ${row.message}\n` + // Isi pesan/subjek tiket
-                  `🕒 ${row.created_at.toLocaleString()}\n` + // Waktu pembuatan
-                  `Status: ${row.status}\n\n`; // Status tiket, diikuti dua baris baru untuk pemisah
-});
+                // 2. Simpan pesan awal di tabel 'messages'
+                await db.query(
+                    "INSERT INTO messages (ticket_id, sender, name, message, is_from_user, created_at) VALUES (?, ?, ?, ?, 1, ?)",
+                    [newTicketId, sender, pushname, initialTicketMessage, new Date()]
+                );
 
-        await lenwy.sendMessage(sender, { text: ticketList });
-    } catch (err) {
-        console.error("Gagal mengambil tiket:", err);
-        await lenwy.sendMessage(sender, { text: "Terjadi kesalahan saat mengambil tiket." });
-    }
-    break;
+                // 3. Tandai pengguna ini memiliki tiket aktif
+                activeUserTickets[sender] = newTicketId;
+
+                const createdAtDate = new Date();
+                const displayTicketId = `TICKET-${createdAtDate.getFullYear()}${String(createdAtDate.getMonth() + 1).padStart(2, '0')}${String(createdAtDate.getDate()).padStart(2, '0')}-${String(newTicketId).padStart(3, '0')}`;
 
 
+                await lenwy.sendMessage(sender, { text: `🎫 Tiket Anda (${displayTicketId}) berhasil dibuat dengan pesan: "${initialTicketMessage}".\n\nSilakan balas chat ini untuk menambahkan detail atau pesan lain terkait tiket ini.` });
 
-    case "listtickets":
-    if (!sender.endsWith("@g.us")) {
-        // Jika command dipanggil bukan di grup, beritahu user
-        await lenwy.sendMessage(sender, { text: "Perintah ini hanya bisa digunakan di grup." });
-        return;
-    }
+            } catch (error) {
+                console.error("❌ Gagal membuat tiket baru:", error);
+                await lenwy.sendMessage(sender, { text: `Terjadi kesalahan teknis saat membuat tiket Anda. Silakan coba lagi nanti. (${error.message})` });
+                // Pastikan tidak ada state menggantung jika gagal
+                if (activeUserTickets[sender]) { // Jika sempat ter-set tapi gagal di tengah jalan
+                   // delete activeUserTickets[sender]; // Sebaiknya dihandle di blok error utama
+                }
+            }
+            break;
 
-    try {
-        // Cari kode lokasi grup ini
-        const [groupRows] = await db.query(
-            "SELECT location_code FROM wa_groups WHERE group_id = ? LIMIT 1",
-            [sender]
-        );
+        case "ticketstatus":
+            try {
+                const [rows] = await db.query(
+                    "SELECT id, message, created_at, status FROM tickets WHERE sender = ? ORDER BY created_at DESC LIMIT 5",
+                    [sender]
+                );
 
-        if (groupRows.length === 0) {
-            await lenwy.sendMessage(sender, { text: "Grup ini belum terdaftar dengan kode lokasi." });
-            return;
-        }
+                if (rows.length === 0) {
+                    await lenwy.sendMessage(sender, { text: "Anda belum memiliki tiket apa pun." });
+                    return;
+                }
 
-        const locationCode = groupRows[0].location_code;
+                let ticketList = "🎫 *5 Tiket Terakhir Anda:*\n\n";
+                rows.forEach((row) => {
+                    const createdAtDate = new Date(row.created_at);
+                    const displayTicketId = `TICKET-${createdAtDate.getFullYear()}${String(createdAtDate.getMonth() + 1).padStart(2, '0')}${String(createdAtDate.getDate()).padStart(2, '0')}-${String(row.id).padStart(3, '0')}`;
+                    ticketList += `*ID: ${displayTicketId}*\n` +
+                                  `Pesan: ${row.message.substring(0, 50)}...\n` +
+                                  `🕒 Dibuat: ${createdAtDate.toLocaleString('id-ID')}\n` +
+                                  `Status: ${row.status === 'open' ? 'Dibuka' : 'Ditutup'}\n\n`;
+                });
+                await lenwy.sendMessage(sender, { text: ticketList });
+            } catch (err) {
+                console.error("Gagal mengambil status tiket:", err);
+                await lenwy.sendMessage(sender, { text: "Terjadi kesalahan saat mengambil status tiket Anda." });
+            }
+            break;
 
-        // Ambil tiket berdasarkan kode lokasi grup
-        const [ticketRows] = await db.query(
-            "SELECT id, name, message, created_at FROM tickets WHERE location_code = ? ORDER BY created_at DESC LIMIT 10",
-            [locationCode]
-        );
+        case "listtickets": // Perintah ini biasanya untuk admin di grup tertentu
+            if (!sender.endsWith("@g.us")) {
+                await lenwy.sendMessage(sender, { text: "Perintah ini hanya bisa digunakan di dalam grup yang terdaftar." });
+                return;
+            }
+            try {
+                const [groupRows] = await db.query(
+                    "SELECT location_code FROM wa_groups WHERE group_id = ? LIMIT 1",
+                    [sender] // sender di sini adalah group_id
+                );
 
-        if (ticketRows.length === 0) {
-            await lenwy.sendMessage(sender, { text: "Belum ada tiket untuk lokasi ini." });
-            return;
-        }
+                if (groupRows.length === 0 || !groupRows[0].location_code) {
+                    await lenwy.sendMessage(sender, { text: "Grup ini belum terdaftar dengan kode lokasi atau kode lokasi kosong." });
+                    return;
+                }
+                const locationCode = groupRows[0].location_code;
 
-        // Buat list tiket
-        let ticketList = `🎫 *Daftar Tiket untuk Lokasi ${locationCode}:*\n\n`;
-        ticketRows.forEach((ticket, index) => {
-    ticketList += `*#${index + 1}* dari ${ticket.name}\nPesan: ${ticket.message}\n🕒 ${new Date(ticket.created_at).toLocaleString()}\n\n`;
-});
+                const [ticketRows] = await db.query(
+                    "SELECT id, name, message, created_at, status FROM tickets WHERE location_code = ? ORDER BY created_at DESC LIMIT 10",
+                    [locationCode]
+                );
 
+                if (ticketRows.length === 0) {
+                    await lenwy.sendMessage(sender, { text: `Belum ada tiket untuk lokasi ${locationCode}.` });
+                    return;
+                }
 
-        await lenwy.sendMessage(sender, { text: ticketList });
-    } catch (err) {
-        console.error("Error saat mengambil daftar tiket:", err);
-        await lenwy.sendMessage(sender, { text: "Terjadi kesalahan saat mengambil daftar tiket." });
-    }
-    break;
+                let ticketListMsg = `🎫 *Daftar Tiket untuk Lokasi ${locationCode}:*\n\n`;
+                ticketRows.forEach((ticket) => {
+                     const createdAtDate = new Date(ticket.created_at);
+                    const displayTicketId = `TICKET-${createdAtDate.getFullYear()}${String(createdAtDate.getMonth() + 1).padStart(2, '0')}${String(createdAtDate.getDate()).padStart(2, '0')}-${String(ticket.id).padStart(3, '0')}`;
+                    ticketListMsg += `*ID: ${displayTicketId}* (Pelapor: ${ticket.name})\n` +
+                                     `Pesan: ${ticket.message.substring(0, 50)}...\n` +
+                                     `🕒 Dibuat: ${createdAtDate.toLocaleString('id-ID')}\n` +
+                                     `Status: ${ticket.status === 'open' ? 'Dibuka' : 'Ditutup'}\n\n`;
+                });
+                await lenwy.sendMessage(sender, { text: ticketListMsg });
+            } catch (err) {
+                console.error("Error saat mengambil daftar tiket grup:", err);
+                await lenwy.sendMessage(sender, { text: "Terjadi kesalahan saat mengambil daftar tiket untuk lokasi ini." });
+            }
+            break;
+        
+        case "help":
+            const helpText =
+`🤖 *Daftar Perintah Bot Helpdesk:*
 
+• *!halo* - Menyapa bot.
+• *!ping* - Cek respons bot.
+• *!ai [pertanyaan]* - Bertanya kepada AI (model standar).
+• *!proai [pertanyaan]* - Bertanya kepada AI (model pro).
+• *!tiket [deskripsi masalah]* - Membuat tiket bantuan baru.
+  Contoh: \`!tiket Printer tidak bisa mencetak\`
+• *!ticketstatus* - Melihat status 5 tiket terakhir Anda.
+• *!listtickets* - (Khusus Admin di Grup) Melihat tiket berdasarkan lokasi grup.
 
+Anda dapat membalas chat ini untuk melanjutkan percakapan pada tiket yang aktif.`;
 
-    case "help":
-    const helpText = 
-`🤖 *Daftar Perintah:*
-
-• !ping - Cek respons bot
-• !ai [pertanyaan] - Tanya AI biasa
-• !proai [pertanyaan] - Tanya AI pro
-• !ticket - Tambah tiket baru
-• !ticketstatus - Lihat status tiketmu
-• !listtickets - (Grup) Lihat tiket lokasi grup
-
-Pilih tombol di bawah untuk cepat menggunakan perintah.`;
-
-    const buttons = [
-        { buttonId: "!ticketstatus", buttonText: { displayText: "Show Tickets" }, type: 1 },
-        { buttonId: "!ticket", buttonText: { displayText: "Add Ticket" }, type: 1 }
-    ];
-
-    await lenwy.sendMessage(sender, {
-        text: helpText,
-        footer: "Select an option below 👇",
-        buttons: buttons,
-        headerType: 1 // TEXT
-    }, { quoted: msg });
-
-
-    break;
-
+            // Tombol bisa ditambahkan jika platform mendukung dan Baileys dikonfigurasi untuk itu
+            // const buttons = [
+            //     { buttonId: "!ticket", buttonText: { displayText: "Buat Tiket Baru" }, type: 1 },
+            //     { buttonId: "!ticketstatus", buttonText: { displayText: "Cek Status Tiket Saya" }, type: 1 }
+            // ];
+            await lenwy.sendMessage(sender, {
+                text: helpText,
+                // footer: "Pilih opsi atau ketik perintah.",
+                // buttons: buttons, // Aktifkan jika ingin menggunakan tombol
+                // headerType: 1
+            });
+            break;
 
         default:
-            await lenwy.sendMessage(sender, { text: "Perintah tidak dikenali." })
+            // Jangan kirim "Perintah tidak dikenali" jika itu bukan pesan yang dimulai dengan "!"
+            // karena sudah ditangani di index.js untuk AI atau pesan tiket.
+            // Jika sampai sini, berarti memang perintah tidak valid.
+            await lenwy.sendMessage(sender, { text: `Perintah \`!${command}\` tidak dikenali. Ketik \`!help\` untuk daftar perintah.` });
     }
-   
-}
+};
