@@ -109,17 +109,40 @@ async function startBot() {
         }
         // 3. Jika bukan perintah dan tidak ada tiket aktif (logika AI atau balasan default)
         else if (!activeUserTickets[sender]) { // Tambahan kondisi untuk memastikan tidak ada tiket aktif
-            try {
-                const response = await agentAI(text);
-                await sock.sendPresenceUpdate('composing', sender);
-                await new Promise(resolve => setTimeout(resolve, 1500)); // Delay
-                await sock.sendPresenceUpdate('paused', sender);
-                await sock.sendMessage(sender, { text: response });
-            } catch (err) {
-                console.error("❌ Error ProAI:", err);
-                await sock.sendMessage(sender, { text: `❌ Terjadi kesalahan saat menghubungi ProAI: ${err.message}` });
-            }
+    try {
+        // Mengasumsikan agentAI(text) mengembalikan objek yang berisi .choices[0].message.content
+        const aiResponseObject = await agentAI(text);
+        let originalContent = "";
+
+        // Pastikan struktur respons AI sesuai harapan sebelum mengakses propertinya
+        if (aiResponseObject && aiResponseObject.choices && aiResponseObject.choices[0] && aiResponseObject.choices[0].message && aiResponseObject.choices[0].message.content) {
+            originalContent = aiResponseObject.choices[0].message.content;
+        } else if (typeof aiResponseObject === 'string') {
+            // Jika agentAI langsung mengembalikan string (bukan objek)
+            originalContent = aiResponseObject;
+        } else {
+            console.error("❌ Error ProAI: Struktur respons tidak dikenal dari agentAI", aiResponseObject);
+            await sock.sendMessage(sender, { text: `❌ Terjadi kesalahan: Struktur respons AI tidak dikenali.` });
+            return; // Keluar dari blok jika struktur tidak sesuai
         }
+
+        const cleanContent = originalContent
+            .replace(/\[\d+(?:,\s*(?:pp\.|p\.)\s*[\d-]+)?\]/g, '') // Hapus sitasi seperti [1]
+            // Ganti "References:" dan semua setelahnya dengan link Bitly dan teks pendahuluan
+            .replace(/References:[\s\S]*$/, "Untuk panduan troubleshooting lebih lanjut, silakan kunjungi: https://bit.ly/Handbook-Panduan-Troubleshooting")
+            .trim();
+
+        await sock.sendPresenceUpdate('composing', sender);
+        await new Promise(resolve => setTimeout(resolve, 1500)); // Delay
+        await sock.sendPresenceUpdate('paused', sender);
+        // Kirim cleanContent yang sudah dimodifikasi
+        await sock.sendMessage(sender, { text: cleanContent });
+
+    } catch (err) {
+        console.error("❌ Error ProAI:", err);
+        await sock.sendMessage(sender, { text: `❌ Terjadi kesalahan saat menghubungi ProAI: ${err.message}` });
+    }
+}
     });
 }
 
@@ -289,14 +312,14 @@ app.patch('/ticket/status/:id', async (req, res) => {
             }
             // Kirim notifikasi ke pengguna bahwa tiketnya ditutup
             if (userJid && sock) {
-                await sock.sendMessage(userJid, { text: `ℹ️ Tiket Anda dengan ID #${ticketId} telah ditutup.` });
+                await sock.sendMessage(userJid, { text: `ℹ️ Tiket Anda ID #${ticketId} telah ditutup.` });
             }
         } else if (status === 'open') {
             // Jika tiket dibuka kembali, tambahkan kembali ke activeUserTickets agar pengguna bisa lanjut membalas
              activeUserTickets[userJid] = parseInt(ticketId);
              console.log(chalk.blue(` Tiket untuk ${userJid} (ID: ${ticketId}) dibuka kembali dan ditambahkan ke pelacakan aktif.`));
              if (userJid && sock) {
-                await sock.sendMessage(userJid, { text: `ℹ️ Tiket Anda dengan ID #${ticketId} telah dibuka kembali. Anda dapat melanjutkan percakapan.` });
+                await sock.sendMessage(userJid, { text: `ℹ️ Tiket Anda ID #${ticketId} telah dibuka kembali. Anda dapat melanjutkan percakapan.` });
             }
         }
 

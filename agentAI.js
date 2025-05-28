@@ -15,7 +15,7 @@ async function main() {
     .replace(/\[\d+(?:,\s*(?:pp\.|p\.)\s*[\d-]+)?\]/g, '') // Remove citations like [1]
     .replace(/References:[\s\S]*$/, '') // Remove original references
     .trim()
-    + `\n\nReferences:\n1. [Parkee Troubleshooting Handbook](https://bit.ly/panduan-troubleshoot-parkee-os)`;
+    + `\n\nReferences:\n1. [Parkee Troubleshooting Handbook](https://bit.ly/Handbook-Panduan-Troubleshooting)`;
 
   console.log("Jawaban bersih dari AI:", cleanContent);
 }
