@@ -158,7 +158,7 @@ module.exports = async (lenwy, m, activeUserTickets, db) => { // Tambahkan activ
                     text: "Mohon gunakan format berikut (pastikan setiap field di baris baru setelah `!ticket`)" 
                 });
                 await lenwy.sendMessage(sender, { 
-                    text: "!ticket\nNama : [Nama Anda]\nKode Lokasi: [Kode Lokasi Anda]\nKendala: [Deskripsi Kendala Anda]" 
+                    text: "!ticket\nNama : [Nama Anda]\nGM: [Kode Lokasi Anda]\nKendala: [Deskripsi Kendala Anda]" 
                 });
                 return;
             }
@@ -336,11 +336,11 @@ module.exports = async (lenwy, m, activeUserTickets, db) => { // Tambahkan activ
   \`\`\`
   !ticket
   Nama : [Nama Anda]
-  Kode Lokasi: [Kode Lokasi Anda]
+  GM: [Kode Lokasi Anda]
   Kendala: [Deskripsi Kendala Anda]
   \`\`\`
 • *!ticketstatus* - Melihat status 5 tiket terakhir Anda.
-• *!closeticket* - Menutup tiket Anda yang sedang aktif.
+
 • *!listtickets* - (Khusus Admin di Grup) Melihat tiket berdasarkan lokasi grup.
 
 Anda dapat membalas chat ini untuk melanjutkan percakapan pada tiket yang aktif.`;
