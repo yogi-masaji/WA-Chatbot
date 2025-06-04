@@ -15,7 +15,7 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 4000;
 const JWT_SECRET = process.env.JWT_SECRET;
-const COMPLAINT_REPORT_URL_BASE = process.env.VITE_HELPDESK_COMPLAINT_REPORT_URL_BASE || 'http://localhost:3001';
+const COMPLAINT_REPORT_URL_BASE = process.env.COMPLAINT_REPORT_URL_BASE;
 
 
 // Tambahan untuk POST complaint
@@ -49,7 +49,7 @@ function authenticateToken(req, res, next) {
 }
 
 // --- Multer Setup untuk Upload File Komplain ---
-const complaintUploadsDir = path.join(__dirname, 'uploads', 'complaints');
+const complaintUploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(complaintUploadsDir)){
     fs.mkdirSync(complaintUploadsDir, { recursive: true });
     console.log(chalk.blue(`📁 Created directory for complaint uploads: ${complaintUploadsDir}`));
