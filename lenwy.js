@@ -161,12 +161,18 @@ module.exports = async (lenwy, m, activeUserTickets, db) => { // Tambahkan activ
             const ticketMatch = body.match(/^!ticket\s*\r?\nNama\s*:\s*(.+)\s*\r?\nGM\s*:\s*(.+)\s*\r?\nLokasi\s*:\s*(.+)\s*\r?\nKendala\s*:\s*([\s\S]+)/im);
 
             if (!ticketMatch) {
-                await lenwy.sendMessage(sender, { 
-                    text: "Mohon gunakan format berikut (pastikan setiap field di baris baru setelah `!ticket` dan isi semua field):" 
-                });
+               await lenwy.sendMessage(sender, { 
+    text: `Mohon gunakan format berikut (pastikan setiap field di baris baru setelah !ticket dan isi semua field).\n
+kode GM: 
+- MSR (M Soleh)
+- EKA (Endro)
+- DA (Dian)
+- DL (Dolly)`
+});
+
                 // Pesan contoh format diperbarui
                 await lenwy.sendMessage(sender, { 
-                    text: "!ticket\nNama : [Nama Anda]\nGM: [Kode GM Anda]\nLokasi: [Lokasi Anda]\nKendala: [Deskripsi Kendala Anda]" 
+                    text: "!ticket\nNama : [Nama Anda]\nGM: [Kode GM]\nLokasi: [Lokasi Anda]\nKendala: [Deskripsi Kendala Anda]" 
                 });
                 return;
             }
